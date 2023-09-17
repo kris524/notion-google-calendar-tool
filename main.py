@@ -20,6 +20,8 @@ def read_text(client, page_id):
     response = client.blocks.children.list(block_id=page_id)
     return response["results"]
 
+
+
 # pprint(page)
 print("----------------------------")
 pprint(read_text(client, PAGE_ID))
