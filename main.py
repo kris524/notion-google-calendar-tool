@@ -16,7 +16,7 @@ load_dotenv()
 
 NOTION_ID = os.getenv("NOTION_KEY")
 PAGE_ID = os.getenv("NOTION_PAGE_ID")
-SCOPES = ['https://www.googleapis.com/auth/tasks.readonly']
+SCOPES = ['https://www.googleapis.com/auth/tasks']
 
 
 
@@ -53,11 +53,7 @@ def get_todo(client, all_blocks):
 
 
 
-
-
-
-
-def main():
+def authenticate_and_print():
     """Shows basic usage of the Tasks API.
     Prints the title and ID of the first 10 task lists.
     """
@@ -98,6 +94,14 @@ def main():
 
 
 
+def insert_notion_tasks_in_google_tasks():
+    creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    service = build('tasks', 'v1', credentials=creds)
+
+
+tasklist = "list2"
+INSERT_LIST = f"https://tasks.googleapis.com/tasks/v1/lists/{tasklist}/tasks"
+
 if __name__ == "__main__":
 
     client = Client(auth=NOTION_ID)
@@ -105,5 +109,5 @@ if __name__ == "__main__":
 
     # pprint(all_blocks)
     pprint(get_todo(client, all_blocks))
-    main()
+    # main()
 
