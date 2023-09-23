@@ -18,9 +18,8 @@ NOTION_ID = os.getenv("NOTION_KEY")
 PAGE_ID = os.getenv("NOTION_PAGE_ID")
 SCOPES = ['https://www.googleapis.com/auth/tasks']
 
-
-
-
+#-----------------
+# NOTION FUNCTIONS
 def get_all_blocks(client, page_id):
     """Get all blocks on the page given via page_id"""
     response = client.blocks.children.list(block_id=page_id)
@@ -38,8 +37,9 @@ def get_todo(client, all_blocks):
             checked = to_do_block["checked"]
             content = to_do_block["rich_text"][0]["plain_text"]
 
-            result["checked"]=checked
-            result["content"]=content
+            # result["checked"]=checked
+            result["status"] = "needsAction"
+            result["title"]=content
 
             to_do_blocks.append(result)
 
@@ -51,7 +51,12 @@ def get_todo(client, all_blocks):
 
     return to_do_blocks
 
+def get_all_notion_todos_all_pages():
+    ...
 
+
+#-----------------
+# GOOGLE FUNCTIONS
 
 def authenticate_and_print():
     """Shows basic usage of the Tasks API.
@@ -75,39 +80,57 @@ def authenticate_and_print():
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
 
-    try:
-        service = build('tasks', 'v1', credentials=creds)
+    return creds
+    # try:
+    #     service = build('tasks', 'v1', credentials=creds)
 
-        # Call the Tasks API
-        results = service.tasklists().list(maxResults=10).execute()
-        items = results.get('items', [])
+    #     # Call the Tasks API
+    #     results = service.tasklists().list(maxResults=10).execute()
+    #     items = results.get('items', [])
 
-        if not items:
-            print('No task lists found.')
-            return
+    #     if not items:
+    #         print('No task lists found.')
+    #         return
 
-        print('Task lists:')
-        for item in items:
-            print(u'{0} ({1})'.format(item['title'], item['id']))
-    except HttpError as err:
-        print(err)
+    #     print('Task lists:')
+    #     for item in items:
+    #         print(u'{0} ({1})'.format(item['title'], item['id']))
+    # except HttpError as err:
+    #     print(err)
 
 
 
-def insert_notion_tasks_in_google_tasks():
-    creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+def insert_notion_tasks_in_google_tasks(creds, notion_tasks):
+    # creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     service = build('tasks', 'v1', credentials=creds)
+    for notion_task in notion_tasks:
+        service.tasks().insert(tasklist="NzY5SkRySG5xMVRBU1VVTQ", body=notion_task).execute()
 
 
-tasklist = "list2"
-INSERT_LIST = f"https://tasks.googleapis.com/tasks/v1/lists/{tasklist}/tasks"
+def update_google_tasks():
+    ...
+
+def create_notion_tasklist():
+    ...
+
+
+
 
 if __name__ == "__main__":
 
     client = Client(auth=NOTION_ID)
     all_blocks = get_all_blocks(client, PAGE_ID)
 
-    # pprint(all_blocks)
-    pprint(get_todo(client, all_blocks))
-    # main()
 
+    pprint(get_todo(client, all_blocks))
+    notion_tasks = get_todo(client, all_blocks)
+    creds = authenticate_and_print()
+    insert_notion_tasks_in_google_tasks(creds, notion_tasks)
+
+
+
+#TODO: NEXT STEPS:
+
+# you will create a new list called notion tasks if it doesnt exist 
+# and add all tasks from all notion pages there. so its a Many to One relation 
+# (Every notion page that has a todo, we take the todo and add it to a single Google tasks list called notion tasks)
