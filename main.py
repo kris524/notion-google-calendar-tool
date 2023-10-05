@@ -37,8 +37,11 @@ def get_todo(client, all_blocks):
             checked = to_do_block["checked"]
             content = to_do_block["rich_text"][0]["plain_text"]
 
-            # result["checked"]=checked
-            result["status"] = "needsAction"
+            if not checked:
+                result["status"] = "needsAction"
+            else:
+                result["status"] = "completed"
+
             result["title"]=content
 
             to_do_blocks.append(result)
@@ -79,31 +82,22 @@ def authenticate_and_print():
         # Save the credentials for the next run
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
+    
+    try:
+        service = build('tasks', 'v1', credentials=creds)
+    except HttpError as err:
+        print(err)
 
-    return creds
-    # try:
-    #     service = build('tasks', 'v1', credentials=creds)
-
-    #     # Call the Tasks API
-    #     results = service.tasklists().list(maxResults=10).execute()
-    #     items = results.get('items', [])
-
-    #     if not items:
-    #         print('No task lists found.')
-    #         return
-
-    #     print('Task lists:')
-    #     for item in items:
-    #         print(u'{0} ({1})'.format(item['title'], item['id']))
-    # except HttpError as err:
-    #     print(err)
+    return service
 
 
+def insert_notion_tasks_in_google_tasks(service, notion_tasks):
 
-def insert_notion_tasks_in_google_tasks(creds, notion_tasks):
-    # creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    service = build('tasks', 'v1', credentials=creds)
+    res = service.tasks().list(tasklist="NzY5SkRySG5xMVRBU1VVTQ").execute()
+    items = res.get('items', [])
+    pprint(items)
     for notion_task in notion_tasks:
+        # if notion_task["title"] 
         service.tasks().insert(tasklist="NzY5SkRySG5xMVRBU1VVTQ", body=notion_task).execute()
 
 
@@ -114,7 +108,7 @@ def create_notion_tasklist():
     ...
 
 
-
+service = authenticate_and_print()
 
 if __name__ == "__main__":
 
@@ -124,8 +118,7 @@ if __name__ == "__main__":
 
     pprint(get_todo(client, all_blocks))
     notion_tasks = get_todo(client, all_blocks)
-    creds = authenticate_and_print()
-    insert_notion_tasks_in_google_tasks(creds, notion_tasks)
+    insert_notion_tasks_in_google_tasks(service, notion_tasks)
 
 
 
@@ -134,3 +127,10 @@ if __name__ == "__main__":
 # you will create a new list called notion tasks if it doesnt exist 
 # and add all tasks from all notion pages there. so its a Many to One relation 
 # (Every notion page that has a todo, we take the todo and add it to a single Google tasks list called notion tasks)
+
+
+#If a task is ticked on Google Calendar, it should be ticket on Notion as well, same vice versa
+# 
+# (???) We want to develop functionality that If a task is created on Notion, it appears on GC, but what if we create a task in GC? Do we want it to appear in Notion? (Two way communication?)
+
+# Do we need a database or anything other that this code?
