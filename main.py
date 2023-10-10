@@ -100,19 +100,22 @@ def insert_notion_tasks_in_google_tasks(service, notion_tasks):
     # import ipdb; ipdb.set_trace()
     for notion_task in notion_tasks[::-1]:
 
-        if notion_task not in current_google_tasks:
+        if notion_task["title"] not in current_google_tasks: #if its added to Completed, that cache will prevent future additions with the same name
 
             service.tasks().insert(tasklist="NzY5SkRySG5xMVRBU1VVTQ", body=notion_task).execute()
 
 
 def update_google_tasks(service, notion_tasks):
-    
+
     current_google_tasks = [task["title"] for task in service.tasks().list(tasklist="NzY5SkRySG5xMVRBU1VVTQ").execute()["items"]]
 
-    # import ipdb; ipdb.set_trace()
-    for notion_task in notion_tasks[::-1]:
-
-        if notion_task in current_google_tasks and notion_task["status"]=="completed":
+    import ipdb; ipdb.set_trace()
+    for notion_task in notion_tasks:
+        
+        #TODO: Fix this patch request by giving it the task id,
+        # use the title to get the right dict and then take its id,
+        # make sure you compare the status as well, to ensure its considered notComplete from the Googles perspective
+        if notion_task["title"] in current_google_tasks and notion_task["status"]=="completed":
 
             service.tasks().patch(tasklist="NzY5SkRySG5xMVRBU1VVTQ", body=notion_task).execute()
 
