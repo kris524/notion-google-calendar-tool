@@ -92,23 +92,37 @@ def authenticate_and_print():
 
 
 def insert_notion_tasks_in_google_tasks(service, notion_tasks):
+    """Function to insert notion tasks in Google, if they are not already there"""
 
-    res = service.tasks().list(tasklist="NzY5SkRySG5xMVRBU1VVTQ").execute()
-    items = res.get('items', [])
-    pprint(items)
-    for notion_task in notion_tasks:
-        # if notion_task["title"] 
-        service.tasks().insert(tasklist="NzY5SkRySG5xMVRBU1VVTQ", body=notion_task).execute()
+    # current_google_tasks = [{"title": task["title"], "status": task["status"]} for task in service.tasks().list(tasklist="NzY5SkRySG5xMVRBU1VVTQ").execute()["items"]]
+    current_google_tasks = [task["title"] for task in service.tasks().list(tasklist="NzY5SkRySG5xMVRBU1VVTQ").execute()["items"]]
+
+    # import ipdb; ipdb.set_trace()
+    for notion_task in notion_tasks[::-1]:
+
+        if notion_task not in current_google_tasks:
+
+            service.tasks().insert(tasklist="NzY5SkRySG5xMVRBU1VVTQ", body=notion_task).execute()
 
 
-def update_google_tasks():
-    ...
+def update_google_tasks(service, notion_tasks):
+    
+    current_google_tasks = [task["title"] for task in service.tasks().list(tasklist="NzY5SkRySG5xMVRBU1VVTQ").execute()["items"]]
+
+    # import ipdb; ipdb.set_trace()
+    for notion_task in notion_tasks[::-1]:
+
+        if notion_task in current_google_tasks and notion_task["status"]=="completed":
+
+            service.tasks().patch(tasklist="NzY5SkRySG5xMVRBU1VVTQ", body=notion_task).execute()
+
 
 def create_notion_tasklist():
     ...
 
 
 service = authenticate_and_print()
+
 
 if __name__ == "__main__":
 
@@ -119,6 +133,7 @@ if __name__ == "__main__":
     pprint(get_todo(client, all_blocks))
     notion_tasks = get_todo(client, all_blocks)
     insert_notion_tasks_in_google_tasks(service, notion_tasks)
+    update_google_tasks(service, notion_tasks)
 
 
 
