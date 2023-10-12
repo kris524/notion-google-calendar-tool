@@ -106,7 +106,6 @@ def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
 
             service.tasks().insert(tasklist=task_list_id, body=notion_task).execute()
 
-# NzY5SkRySG5xMVRBU1VVTQ
 def update_google_tasks(service, notion_tasks, task_list_id):
 
     """Function that Updates tasks. Closes tasks marked as completed from Notion to Google Takss"""
@@ -135,7 +134,7 @@ def create_notion_tasklist() -> str:
             return task_list["id"]
     
     new_task_list = service.tasklists().insert(body={"title": "Tasks from Notion"}).execute()
-    return new_task_list["id"] # dFlMU0VucW9WanVmclRNWg
+    return new_task_list["id"] 
 
 
 
@@ -157,16 +156,14 @@ if __name__ == "__main__":
     update_google_tasks(service, notion_tasks, TASK_LIST_ID)
     
 
-
-#TODO: NEXT STEPS:
-
-# you will create a new list called notion tasks if it doesnt exist 
-# and add all tasks from all notion pages there. so its a Many to One relation 
-# (Every notion page that has a todo, we take the todo and add it to a single Google tasks list called notion tasks)
+#PHASE 1: Basic logic ----- DONE
+#PHASE 2: Make it Live <---
+#PHAVE 3: Make it production grade ready (Product Hunt release)
 
 
-#If a task is ticked on Google Calendar, it should be ticket on Notion as well, same vice versa
-# 
-# (???) We want to develop functionality that If a task is created on Notion, it appears on GC, but what if we create a task in GC? Do we want it to appear in Notion? (Two way communication?)
 
-# Do we need a database or anything other that this code?
+# Extra features:
+# Parse all Notion pages for todos and add them to a single Google Tasks List
+# If a task is ticked on Google Calendar, it should be ticket on Notion as well
+# Add Tests and CI/CD
+
