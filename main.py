@@ -2,7 +2,7 @@ import os
 from notion_client import Client
 from pprint import pprint
 from dotenv import load_dotenv
-
+from typing import List
 import os.path
 
 from google.auth.transport.requests import Request
@@ -20,7 +20,21 @@ SCOPES = ["https://www.googleapis.com/auth/tasks"]
 
 # -----------------
 # NOTION FUNCTIONS
-def get_all_blocks(client, page_id):
+
+def get_all_pages(client: Client):
+    """Get all pages that have enabled the integration"""
+    
+    page_ids = []
+    for page in client.search()["results"]:
+        page_ids.append(page["id"])
+    
+    return page_ids
+    
+
+
+
+
+def get_all_blocks(client: Client, page_id):
     """Get all blocks on the page given via page_id"""
     response = client.blocks.children.list(block_id=page_id)
     return response["results"]
@@ -51,10 +65,6 @@ def get_todo(client, all_blocks):
             to_do_blocks.extend(nested_result)
 
     return to_do_blocks
-
-
-def get_all_notion_todos_all_pages():
-    ...
 
 
 # -----------------
@@ -92,7 +102,6 @@ def authenticate_and_print():
 
 # -----------------
 # NOTION-GOOGLE API CALLS
-
 
 def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
     """Function to insert notion tasks in Google, if they are not already there"""
@@ -134,7 +143,6 @@ service = authenticate_and_print()
 
 def create_notion_tasklist() -> str:
 
-    # import ipdb;ipdb.set_trace()
     for task_list in service.tasklists().list().execute()["items"]:
         if task_list["title"] == "Tasks from Notion":
             return task_list["id"]
@@ -147,10 +155,20 @@ def create_notion_tasklist() -> str:
 
 if __name__ == "__main__":
 
+    # Create Client 
     client = Client(auth=NOTION_ID)
-    all_blocks = get_all_blocks(client, PAGE_ID)
 
+    # Get all page ids
+    page_ids = get_all_pages(client)
+
+    # Get every block from each page id
+    all_blocks = []
+    for page_id in page_ids:
+        all_blocks.extend(get_all_blocks(client, page_id))
+    
     pprint(get_todo(client, all_blocks))
+
+    # Get all todos 
     notion_tasks = get_todo(client, all_blocks)
 
     TASK_LIST_ID = create_notion_tasklist()
@@ -166,4 +184,9 @@ if __name__ == "__main__":
 # Extra features:
 # Parse all Notion pages for todos and add them to a single Google Tasks List
 # If a task is ticked on Google Calendar, it should be ticket on Notion as well
-# Add Tests and CI/CD
+# Add Tests 
+# CI/CD
+# Fix the bug of adding a new task, when an existing one in Notion has changed, you only need to 
+# Add docs how to set it up
+# add try, except and Logging 
+# When a task is deleted in Notion -> dete it in Google tasks as well
