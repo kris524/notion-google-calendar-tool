@@ -119,14 +119,11 @@ def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
     ]
     # import ipdb; ipdb.set_trace()
 
-    r.set()
-
     for notion_task in notion_tasks[::-1]:
         
         google_task_id = r.get(notion_task["id"])
         
-        if 
-        # if notion_task["title"] not in current_google_tasks and : 
+        if notion_task["title"] not in current_google_tasks: 
             #google only knows about the title of the task, not the id. TO prevent inserting EDITED TASKS, 
             # you need to check the ids are different. No task with an existing ID should be added 
             # Problem, the id in notion and the id in google are different, cannot set googe id, 
@@ -174,6 +171,26 @@ def create_notion_tasklist() -> str:
     return new_task_list["id"]
 
 
+def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
+    """Add key-value mapping between Notion todo ids and Google todo ids"""
+
+    current_google_tasks = [
+        {"title": task["title"], "id": task["id"], "status": task["status"]}
+        for task in service.tasks().list(tasklist=task_list_id).execute()["items"]
+    ]
+
+    for notion_task in notion_tasks:
+        for google_task in current_google_tasks:
+            
+            if r.get(notion_task["id"]):
+                logging.info("ID already in Redis, skipping")
+                continue
+
+            elif notion_task["title"] == google_task["title"] and notion_task['status'] == google_task['status']:
+                r.set(notion_task['id'], google_task['id'])
+                logging.info(f"Successfully added k: {notion_task['id']} v: {google_task['id']}")
+
+
 if __name__ == "__main__":
 
     # Create Client 
@@ -193,6 +210,13 @@ if __name__ == "__main__":
     notion_tasks = get_todo(client, all_blocks)
 
     TASK_LIST_ID = create_notion_tasklist()
+
+    import ipdb;ipdb.set_trace()
+    # If redis is empty, add all data
+    if not r.keys(): # replace .keys() with something different later
+        logging.info("Adding new data to Redis")
+        add_id_mapping_to_redis(service, notion_tasks, TASK_LIST_ID )
+
 
     insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
     # update_google_tasks(service, notion_tasks, TASK_LIST_ID)
