@@ -11,17 +11,21 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+import redis
+# logging.basicConfig(level=logging.DEBUG)
 
-logging.basicConfig(level=logging.DEBUG)
+# -----------------
+# SETUP
 
 load_dotenv()
-
 NOTION_ID = os.getenv("NOTION_KEY")
-
 if NOTION_ID is None:
     raise KeyError("Missing NOTION ID environment variable")
-
 SCOPES = ["https://www.googleapis.com/auth/tasks"]
+
+r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+
+
 
 # -----------------
 # NOTION FUNCTIONS
@@ -52,6 +56,9 @@ def get_todo(client: Client, all_blocks: List[Dict[str,str]]):
         result = {}
         if block["type"] == "to_do":
             to_do_block = block["to_do"]
+            # import ipdb;ipdb.set_trace()
+            # print(to_do_block)
+            print(block["id"])
             checked = to_do_block["checked"]
             content = to_do_block["rich_text"][0]["plain_text"]
 
@@ -61,6 +68,7 @@ def get_todo(client: Client, all_blocks: List[Dict[str,str]]):
                 result["status"] = "completed"
 
             result["title"] = content
+            result["id"] = block["id"]
 
             to_do_blocks.append(result)
 
@@ -79,30 +87,22 @@ def get_todo(client: Client, all_blocks: List[Dict[str,str]]):
 # AUTH FUNCTION
 
 def authenticate_and_print():
-    """Shows basic usage of the Tasks API.
-    Prints the title and ID of the first 10 task lists.
-    """
+    """Authentication with Google"""
     creds = None
-    # The file token.json stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-    # If there are no (valid) credentials available, let the user log in.
+
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
+        flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+        creds = flow.run_local_server(port=0)
+
         with open("token.json", "w") as token:
             token.write(creds.to_json())
 
     try:
         service = build("tasks", "v1", credentials=creds)
     except HttpError as err:
-        print(err)
+        logging.error(err)
 
     return service
 
@@ -111,16 +111,29 @@ def authenticate_and_print():
 # NOTION-GOOGLE API CALLS
 
 def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
-    """Function to insert notion tasks in Google, if they are not already there"""
+    """Insert notion tasks in Google, if they are not already there"""
 
     current_google_tasks = [
-        task["title"]
+        {"google_task": task["title"],  "google_task_id": task["id"] }
         for task in service.tasks().list(tasklist=task_list_id).execute()["items"]
     ]
+    # import ipdb; ipdb.set_trace()
+
+    r.set()
 
     for notion_task in notion_tasks[::-1]:
+        
+        google_task_id = r.get(notion_task["id"])
+        
+        if 
+        # if notion_task["title"] not in current_google_tasks and : 
+            #google only knows about the title of the task, not the id. TO prevent inserting EDITED TASKS, 
+            # you need to check the ids are different. No task with an existing ID should be added 
+            # Problem, the id in notion and the id in google are different, cannot set googe id, 
 
-        if notion_task["title"] not in current_google_tasks:
+
+            #SOLUTION: Use redis to store key-value pair, the key wil be the id Notion generates 
+            # and will match the Google generated id
 
             service.tasks().insert(tasklist=task_list_id, body=notion_task).execute()
 
@@ -182,12 +195,14 @@ if __name__ == "__main__":
     TASK_LIST_ID = create_notion_tasklist()
 
     insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
-    update_google_tasks(service, notion_tasks, TASK_LIST_ID)
+    # update_google_tasks(service, notion_tasks, TASK_LIST_ID)
 
 
 
 # Extra features:
 # Fix the bug of adding a new task, when an existing one in Notion has changed, you only need to, you will have to use the ID
+
+
 # If a task is ticked on Google Calendar, it should be ticket on Notion as well
 # Add Tests 
 # CI/CD
