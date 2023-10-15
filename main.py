@@ -2,8 +2,9 @@ import os
 from notion_client import Client
 from pprint import pprint
 from dotenv import load_dotenv
-from typing import List
+from typing import List, Dict
 import os.path
+import logging
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -11,36 +12,40 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+logging.basicConfig(level=logging.DEBUG)
 
 load_dotenv()
 
 NOTION_ID = os.getenv("NOTION_KEY")
-PAGE_ID = os.getenv("NOTION_PAGE_ID")
+
+if NOTION_ID is None:
+    raise KeyError("Missing NOTION ID environment variable")
+
 SCOPES = ["https://www.googleapis.com/auth/tasks"]
 
 # -----------------
 # NOTION FUNCTIONS
 
-def get_all_pages(client: Client):
+def get_all_pages(client: Client) -> List[str]:
     """Get all pages that have enabled the integration"""
     
     page_ids = []
     for page in client.search()["results"]:
         page_ids.append(page["id"])
     
+    if not page_ids:
+        logging.info("No notion pages have enabled the integration")
+
     return page_ids
     
 
-
-
-
-def get_all_blocks(client: Client, page_id):
+def get_all_blocks(client: Client, page_id: str) -> List[Dict[str,str]]:
     """Get all blocks on the page given via page_id"""
     response = client.blocks.children.list(block_id=page_id)
     return response["results"]
 
 
-def get_todo(client, all_blocks):
+def get_todo(client: Client, all_blocks: List[Dict[str,str]]):
     """Get all todo blocks given a list of blocks"""
     to_do_blocks = []
     for block in all_blocks:
@@ -64,12 +69,14 @@ def get_todo(client, all_blocks):
             nested_result = get_todo(client, nested_block)
             to_do_blocks.extend(nested_result)
 
+    if not to_do_blocks:
+        logging.info("No Todo blocks have been found")
+
     return to_do_blocks
 
 
 # -----------------
 # AUTH FUNCTION
-
 
 def authenticate_and_print():
     """Shows basic usage of the Tasks API.
@@ -105,7 +112,7 @@ def authenticate_and_print():
 
 def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
     """Function to insert notion tasks in Google, if they are not already there"""
-    # import ipdb;ipdb.set_trace()
+
     current_google_tasks = [
         task["title"]
         for task in service.tasks().list(tasklist=task_list_id).execute()["items"]
@@ -142,6 +149,7 @@ service = authenticate_and_print()
 
 
 def create_notion_tasklist() -> str:
+    """Create a dedicated TaskList in Google Tasks if it does not exist"""
 
     for task_list in service.tasklists().list().execute()["items"]:
         if task_list["title"] == "Tasks from Notion":
@@ -165,10 +173,10 @@ if __name__ == "__main__":
     all_blocks = []
     for page_id in page_ids:
         all_blocks.extend(get_all_blocks(client, page_id))
-    
+
     pprint(get_todo(client, all_blocks))
 
-    # Get all todos 
+    # Get all todos
     notion_tasks = get_todo(client, all_blocks)
 
     TASK_LIST_ID = create_notion_tasklist()
@@ -177,16 +185,12 @@ if __name__ == "__main__":
     update_google_tasks(service, notion_tasks, TASK_LIST_ID)
 
 
-# PHASE 1: Basic logic ----- DONE
-# PHASE 2: Make it Live <--- ???
-
 
 # Extra features:
-# Parse all Notion pages for todos and add them to a single Google Tasks List
+# Fix the bug of adding a new task, when an existing one in Notion has changed, you only need to, you will have to use the ID
 # If a task is ticked on Google Calendar, it should be ticket on Notion as well
 # Add Tests 
 # CI/CD
-# Fix the bug of adding a new task, when an existing one in Notion has changed, you only need to 
 # Add docs how to set it up
 # add try, except and Logging 
 # When a task is deleted in Notion -> dete it in Google tasks as well
