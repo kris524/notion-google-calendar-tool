@@ -58,7 +58,7 @@ def get_todo(client: Client, all_blocks: List[Dict[str,str]]):
             to_do_block = block["to_do"]
             # import ipdb;ipdb.set_trace()
             # print(to_do_block)
-            print(block["id"])
+            print("Notion ID:", block["id"])
             checked = to_do_block["checked"]
             content = to_do_block["rich_text"][0]["plain_text"]
 
@@ -112,47 +112,23 @@ def authenticate_and_print():
 
 def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
     """Insert notion tasks in Google, if they are not already there"""
-
-    current_google_tasks = [
-        {"google_task": task["title"],  "google_task_id": task["id"] }
-        for task in service.tasks().list(tasklist=task_list_id).execute()["items"]
-    ]
     # import ipdb; ipdb.set_trace()
-
-    for notion_task in notion_tasks[::-1]:
-        
-        google_task_id = r.get(notion_task["id"])
-        
-        if notion_task["title"] not in current_google_tasks: 
-            #google only knows about the title of the task, not the id. TO prevent inserting EDITED TASKS, 
-            # you need to check the ids are different. No task with an existing ID should be added 
-            # Problem, the id in notion and the id in google are different, cannot set googe id, 
-
-
-            #SOLUTION: Use redis to store key-value pair, the key wil be the id Notion generates 
-            # and will match the Google generated id
-
+    for notion_task in notion_tasks[::-1]:                
+        if r.get(notion_task["id"]) is None:
             service.tasks().insert(tasklist=task_list_id, body=notion_task).execute()
 
 
 def update_google_tasks(service, notion_tasks, task_list_id):
-
     """Function that Updates tasks. Closes tasks marked as completed from Notion to Google Takss"""
 
     current_google_tasks = [
         {"title": task["title"], "id": task["id"], "status": task["status"]}
         for task in service.tasks().list(tasklist=task_list_id).execute()["items"]
     ]
-
+    # import ipdb; ipdb.set_trace()
     for notion_task in notion_tasks:
 
-        for google_task in current_google_tasks:
-            if google_task["title"] == notion_task["title"]:
-
-                service.tasks().patch(
-                    tasklist=task_list_id, task=google_task["id"], body=notion_task
-                ).execute()
-            continue
+        service.tasks().patch(tasklist=task_list_id, task=r.get(notion_task["id"]), body={'status': notion_task['status'], 'title': notion_task['title']}).execute() #BUG: The bug here is that notion_task contains the notion id, before we did not have that
 
 
 service = authenticate_and_print()
@@ -169,6 +145,9 @@ def create_notion_tasklist() -> str:
         service.tasklists().insert(body={"title": "Tasks from Notion"}).execute()
     )
     return new_task_list["id"]
+
+# def get_all_redis_entries():
+
 
 
 def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
@@ -212,14 +191,19 @@ if __name__ == "__main__":
     TASK_LIST_ID = create_notion_tasklist()
 
     import ipdb;ipdb.set_trace()
+    # First insert 
+    insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
+
+
     # If redis is empty, add all data
-    if not r.keys(): # replace .keys() with something different later
+    #TODO replace .keys() with something more efficient later
+    #TODO allow for new task ids to be added
+    if not r.keys(): 
         logging.info("Adding new data to Redis")
         add_id_mapping_to_redis(service, notion_tasks, TASK_LIST_ID )
 
 
-    insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
-    # update_google_tasks(service, notion_tasks, TASK_LIST_ID)
+    update_google_tasks(service, notion_tasks, TASK_LIST_ID)
 
 
 
@@ -229,7 +213,6 @@ if __name__ == "__main__":
 
 # If a task is ticked on Google Calendar, it should be ticket on Notion as well
 # Add Tests 
-# CI/CD
 # Add docs how to set it up
-# add try, except and Logging 
 # When a task is deleted in Notion -> dete it in Google tasks as well
+# Docker 
