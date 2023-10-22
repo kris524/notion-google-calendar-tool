@@ -12,6 +12,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import redis
+
 # logging.basicConfig(level=logging.DEBUG)
 
 # -----------------
@@ -26,30 +27,30 @@ SCOPES = ["https://www.googleapis.com/auth/tasks"]
 r = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
 
-
 # -----------------
 # NOTION FUNCTIONS
 
+
 def get_all_pages(client: Client) -> List[str]:
     """Get all pages that have enabled the integration"""
-    
+
     page_ids = []
     for page in client.search()["results"]:
         page_ids.append(page["id"])
-    
+
     if not page_ids:
         logging.info("No notion pages have enabled the integration")
 
     return page_ids
-    
 
-def get_all_blocks(client: Client, page_id: str) -> List[Dict[str,str]]:
+
+def get_all_blocks(client: Client, page_id: str) -> List[Dict[str, str]]:
     """Get all blocks on the page given via page_id"""
     response = client.blocks.children.list(block_id=page_id)
     return response["results"]
 
 
-def get_todo(client: Client, all_blocks: List[Dict[str,str]]):
+def get_todo(client: Client, all_blocks: List[Dict[str, str]]):
     """Get all todo blocks given a list of blocks"""
     to_do_blocks = []
     for block in all_blocks:
@@ -86,6 +87,7 @@ def get_todo(client: Client, all_blocks: List[Dict[str,str]]):
 # -----------------
 # AUTH FUNCTION
 
+
 def authenticate_and_print():
     """Authentication with Google"""
     creds = None
@@ -110,10 +112,11 @@ def authenticate_and_print():
 # -----------------
 # NOTION-GOOGLE API CALLS
 
+
 def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
     """Insert notion tasks in Google, if they are not already there"""
     # import ipdb; ipdb.set_trace()
-    for notion_task in notion_tasks[::-1]:                
+    for notion_task in notion_tasks[::-1]:
         if r.get(notion_task["id"]) is None:
             service.tasks().insert(tasklist=task_list_id, body=notion_task).execute()
 
@@ -128,7 +131,11 @@ def update_google_tasks(service, notion_tasks, task_list_id):
     # import ipdb; ipdb.set_trace()
     for notion_task in notion_tasks:
 
-        service.tasks().patch(tasklist=task_list_id, task=r.get(notion_task["id"]), body={'status': notion_task['status'], 'title': notion_task['title']}).execute() #BUG: The bug here is that notion_task contains the notion id, before we did not have that
+        service.tasks().patch(
+            tasklist=task_list_id,
+            task=r.get(notion_task["id"]),
+            body={"status": notion_task["status"], "title": notion_task["title"]},
+        ).execute()  # BUG: The bug here is that notion_task contains the notion id, before we did not have that
 
 
 service = authenticate_and_print()
@@ -146,8 +153,8 @@ def create_notion_tasklist() -> str:
     )
     return new_task_list["id"]
 
-# def get_all_redis_entries():
 
+# def get_all_redis_entries():
 
 
 def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
@@ -160,19 +167,24 @@ def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
 
     for notion_task in notion_tasks:
         for google_task in current_google_tasks:
-            
+
             if r.get(notion_task["id"]):
                 logging.info("ID already in Redis, skipping")
                 continue
 
-            elif notion_task["title"] == google_task["title"] and notion_task['status'] == google_task['status']:
-                r.set(notion_task['id'], google_task['id'])
-                logging.info(f"Successfully added k: {notion_task['id']} v: {google_task['id']}")
+            elif (
+                notion_task["title"] == google_task["title"]
+                and notion_task["status"] == google_task["status"]
+            ):
+                r.set(notion_task["id"], google_task["id"])
+                logging.info(
+                    f"Successfully added k: {notion_task['id']} v: {google_task['id']}"
+                )
 
 
 if __name__ == "__main__":
 
-    # Create Client 
+    # Create Client
     client = Client(auth=NOTION_ID)
 
     # Get all page ids
@@ -185,34 +197,27 @@ if __name__ == "__main__":
 
     pprint(get_todo(client, all_blocks))
 
-    # Get all todos
+    # Get all Notion todos
     notion_tasks = get_todo(client, all_blocks)
 
     TASK_LIST_ID = create_notion_tasklist()
 
-    import ipdb;ipdb.set_trace()
-    # First insert 
+    # Insert tasks from Notion to Google
     insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
 
-
-    # If redis is empty, add all data
-    #TODO replace .keys() with something more efficient later
-    #TODO allow for new task ids to be added
-    if not r.keys(): 
+    # TODO replace .keys() with something more efficient later
+    # If redis is empty, or new todo has been added, update the database
+    if not r.keys() or len(r.keys()) != len(notion_tasks):  # add a
         logging.info("Adding new data to Redis")
-        add_id_mapping_to_redis(service, notion_tasks, TASK_LIST_ID )
-
+        add_id_mapping_to_redis(service, notion_tasks, TASK_LIST_ID)
 
     update_google_tasks(service, notion_tasks, TASK_LIST_ID)
 
 
-
 # Extra features:
-# Fix the bug of adding a new task, when an existing one in Notion has changed, you only need to, you will have to use the ID
-
+# When a task is deleted in Notion -> dete it in Google tasks as well AND THE DATABASE
 
 # If a task is ticked on Google Calendar, it should be ticket on Notion as well
-# Add Tests 
+# Add Tests
 # Add docs how to set it up
-# When a task is deleted in Notion -> dete it in Google tasks as well
-# Docker 
+# Docker
