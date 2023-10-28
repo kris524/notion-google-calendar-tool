@@ -57,9 +57,6 @@ def get_todo(client: Client, all_blocks: List[Dict[str, str]]):
         result = {}
         if block["type"] == "to_do":
             to_do_block = block["to_do"]
-            # import ipdb;ipdb.set_trace()
-            # print(to_do_block)
-            print("Notion ID:", block["id"])
             checked = to_do_block["checked"]
             content = to_do_block["rich_text"][0]["plain_text"]
 
@@ -128,14 +125,15 @@ def update_google_tasks(service, notion_tasks, task_list_id):
         {"title": task["title"], "id": task["id"], "status": task["status"]}
         for task in service.tasks().list(tasklist=task_list_id).execute()["items"]
     ]
-    # import ipdb; ipdb.set_trace()
-    for notion_task in notion_tasks:
 
-        service.tasks().patch(
-            tasklist=task_list_id,
-            task=r.get(notion_task["id"]),
-            body={"status": notion_task["status"], "title": notion_task["title"]},
-        ).execute()  # BUG: The bug here is that notion_task contains the notion id, before we did not have that
+    for notion_task in notion_tasks:
+        
+        if r.get(notion_task["id"]) is not None:
+            service.tasks().patch(
+                tasklist=task_list_id,
+                task=r.get(notion_task["id"]),
+                body={"status": notion_task["status"], "title": notion_task["title"]},
+            ).execute()
 
 
 service = authenticate_and_print()
@@ -154,8 +152,8 @@ def create_notion_tasklist() -> str:
     return new_task_list["id"]
 
 
-# def get_all_redis_entries():
-
+# ------
+# REDIS HANDLING
 
 def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
     """Add key-value mapping between Notion todo ids and Google todo ids"""
@@ -182,6 +180,19 @@ def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
                 )
 
 
+def remove_deleted_tasks_ids_from_redis(service, notion_tasks, task_list_id):
+    """Remove a deleted Notion task from Google and Redis"""
+    current_notion_ids = []
+    for notion_task in notion_tasks:
+        current_notion_ids.append(notion_task["id"])
+    
+    for notion_id_in_db in r.keys():
+        if notion_id_in_db not in current_notion_ids:
+                
+            service.tasks().delete(tasklist=task_list_id, task=r.get(notion_id_in_db)).execute()
+            r.delete(notion_id_in_db)
+
+
 if __name__ == "__main__":
 
     # Create Client
@@ -195,8 +206,6 @@ if __name__ == "__main__":
     for page_id in page_ids:
         all_blocks.extend(get_all_blocks(client, page_id))
 
-    pprint(get_todo(client, all_blocks))
-
     # Get all Notion todos
     notion_tasks = get_todo(client, all_blocks)
 
@@ -207,17 +216,26 @@ if __name__ == "__main__":
 
     # TODO replace .keys() with something more efficient later
     # If redis is empty, or new todo has been added, update the database
-    if not r.keys() or len(r.keys()) != len(notion_tasks):  # add a
+    if not r.keys() or len(r.keys()) < len(notion_tasks):  # add a
         logging.info("Adding new data to Redis")
         add_id_mapping_to_redis(service, notion_tasks, TASK_LIST_ID)
 
+    # If redis has more keys than current notion_tasks, delete the Google task and that key
+    if len(r.keys()) > len(notion_tasks):
+        logging.info("Deleting tasks")
+        remove_deleted_tasks_ids_from_redis(service, notion_tasks, TASK_LIST_ID)
+
+    # Update the state of tasks, whenever needed (checked, changed name, etc.)
     update_google_tasks(service, notion_tasks, TASK_LIST_ID)
 
 
 # Extra features:
-# When a task is deleted in Notion -> dete it in Google tasks as well AND THE DATABASE
 
-# If a task is ticked on Google Calendar, it should be ticket on Notion as well
+# Two way street connection, where actions performed in Google will reflect on Notion
+# If a task is ticked on Google Calendar, it should be ticket on Notion as well, etc.
+
+
 # Add Tests
 # Add docs how to set it up
 # Docker
+# Aim for OOD
