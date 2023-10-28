@@ -15,7 +15,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import redis
 
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 # -----------------
 # SETUP
