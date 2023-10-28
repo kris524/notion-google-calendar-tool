@@ -1,3 +1,5 @@
+"""Script that handles the sync from to Notion to Google tasks"""
+
 import os
 from notion_client import Client
 from pprint import pprint
@@ -13,7 +15,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import redis
 
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 # -----------------
 # SETUP
@@ -127,7 +129,7 @@ def update_google_tasks(service, notion_tasks, task_list_id):
     ]
 
     for notion_task in notion_tasks:
-        
+
         if r.get(notion_task["id"]) is not None:
             service.tasks().patch(
                 tasklist=task_list_id,
@@ -154,6 +156,7 @@ def create_notion_tasklist() -> str:
 
 # ------
 # REDIS HANDLING
+
 
 def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
     """Add key-value mapping between Notion todo ids and Google todo ids"""
@@ -185,11 +188,13 @@ def remove_deleted_tasks_ids_from_redis(service, notion_tasks, task_list_id):
     current_notion_ids = []
     for notion_task in notion_tasks:
         current_notion_ids.append(notion_task["id"])
-    
+
     for notion_id_in_db in r.keys():
         if notion_id_in_db not in current_notion_ids:
-                
-            service.tasks().delete(tasklist=task_list_id, task=r.get(notion_id_in_db)).execute()
+
+            service.tasks().delete(
+                tasklist=task_list_id, task=r.get(notion_id_in_db)
+            ).execute()
             r.delete(notion_id_in_db)
 
 
@@ -229,13 +234,3 @@ if __name__ == "__main__":
     update_google_tasks(service, notion_tasks, TASK_LIST_ID)
 
 
-# Extra features:
-
-# Two way street connection, where actions performed in Google will reflect on Notion
-# If a task is ticked on Google Calendar, it should be ticket on Notion as well, etc.
-
-
-# Add Tests
-# Add docs how to set it up
-# Docker
-# Aim for OOD
