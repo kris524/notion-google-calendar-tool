@@ -15,7 +15,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import redis
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 # -----------------
 # SETUP
@@ -35,7 +35,7 @@ r = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
 def get_all_pages(client: Client) -> List[str]:
     """Get all pages that have enabled the integration"""
-
+    # import ipdb;ipdb.set_trace()
     page_ids = []
     for page in client.search()["results"]:
         page_ids.append(page["id"])
@@ -53,7 +53,7 @@ def get_all_blocks(client: Client, page_id: str) -> List[Dict[str, str]]:
 
 
 def get_todo(client: Client, all_blocks: List[Dict[str, str]]):
-    """Get all todo blocks given a list of blocks"""
+    """Get all todo blocks given a list of blocks, if block has children, use recursion"""
     to_do_blocks = []
     for block in all_blocks:
         result = {}
@@ -114,7 +114,7 @@ def authenticate_and_print():
 
 def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
     """Insert notion tasks in Google, if they are not already there"""
-    # import ipdb; ipdb.set_trace()
+
     for notion_task in notion_tasks[::-1]:
         if r.get(notion_task["id"]) is None:
             service.tasks().insert(tasklist=task_list_id, body=notion_task).execute()
