@@ -26,12 +26,11 @@ DUMMY_SEARCH_RES = {
 
 class TestNotionFunctions(unittest.TestCase):
 
-    @patch("notion_client.Client")
+    @patch("notion_to_google_task_sync.Client")
     def test_get_all_pages(self, mock_client):
         """Test correct ids are collected"""
         mock_search = Mock()
         mock_search.return_value = DUMMY_SEARCH_RES
-
         mock_client.search = mock_search
 
         actual = get_all_pages(mock_client)

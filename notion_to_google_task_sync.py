@@ -20,17 +20,9 @@ logging.basicConfig(level=logging.DEBUG)
 # -----------------
 # SETUP
 
-load_dotenv()
-NOTION_ID = os.getenv("NOTION_KEY")
-if NOTION_ID is None:
-    raise KeyError("Missing NOTION ID environment variable")
 SCOPES = ["https://www.googleapis.com/auth/tasks"]
 
 r = redis.Redis(host="localhost", port=6379, decode_responses=True)
-
-class MockClient:
-    def __init__(self) -> None:
-        client = Client()
 
 # -----------------
 # NOTION FUNCTIONS
@@ -202,6 +194,12 @@ def remove_deleted_tasks_ids_from_redis(service, notion_tasks, task_list_id):
 
 
 if __name__ == "__main__":
+
+    load_dotenv()
+    NOTION_ID = os.getenv("NOTION_KEY")  #NOTION_KEY
+    if NOTION_ID is None:
+        raise KeyError("Missing NOTION ID environment variable")
+
 
     # Create Client
     client = Client(auth=NOTION_ID)
