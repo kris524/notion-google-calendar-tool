@@ -133,10 +133,7 @@ def update_google_tasks(service, notion_tasks, task_list_id):
             ).execute()
 
 
-service = authenticate_and_print()
-
-
-def create_notion_tasklist() -> str:
+def create_notion_tasklist(service) -> str:
     """Create a dedicated TaskList in Google Tasks if it does not exist"""
 
     for task_list in service.tasklists().list().execute()["items"]:
@@ -200,6 +197,7 @@ if __name__ == "__main__":
     if NOTION_ID is None:
         raise KeyError("Missing NOTION ID environment variable")
 
+    service = authenticate_and_print()
 
     # Create Client
     client = Client(auth=NOTION_ID)
@@ -215,7 +213,7 @@ if __name__ == "__main__":
     # Get all Notion todos
     notion_tasks = get_todo(client, all_blocks)
 
-    TASK_LIST_ID = create_notion_tasklist()
+    TASK_LIST_ID = create_notion_tasklist(service)
 
     # Insert tasks from Notion to Google
     insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
