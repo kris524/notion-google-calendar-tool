@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, Mock
-from notion_to_google_task_sync import get_all_pages
+from sync.notion_to_google_task_sync import get_all_pages
 
 # simplified example result from client.search() used for mocking purposes
 DUMMY_SEARCH_RES = {
