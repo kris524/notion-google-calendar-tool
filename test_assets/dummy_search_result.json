@@ -1,0 +1,19 @@
+{
+    "has_more": false,
+    "results": [
+        {
+            "archived": false,
+            "cover": "",
+            "created_time": "2023-09-16T15:09:00.000Z",
+            "icon": "",
+            "id": "1211a5ef-1425-40c7-abad-0cb6f98b6fcc",
+            "last_edited_by": {
+                "id": "9cb719ff-10ae-4f82-8677-c8c8232d665a",
+                "object": "user"
+            },
+            "last_edited_time": "2023-10-28T14:28:00.000Z",
+            "public_url": ""
+        }
+    ],
+    "type": "page_or_database"
+}
