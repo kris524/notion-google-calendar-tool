@@ -15,7 +15,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import redis
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 # -----------------
 # SETUP
@@ -30,7 +30,7 @@ r = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
 def get_all_pages(client: Client) -> List[str]:
     """Get all pages that have enabled the integration"""
-    # import ipdb;ipdb.set_trace()
+
     page_ids = []
     for page in client.search()["results"]:
         page_ids.append(page["id"])
