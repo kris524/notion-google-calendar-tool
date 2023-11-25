@@ -18,7 +18,11 @@ from notion_to_google_task_sync import authenticate_and_print
 # Extra features:
 # (???) If a task is added to GC, it should be added to Notion as well (???) Where?
 # TODO: Currently you have a Many-to-one relationship, you might want to have a to One-to-one relationship
+# This is what we want to work on now, we cant establish a true two way connection until we have one to one mapping
 
+
+
+# TODO: Also, update the redis db to have the reverse mapping, map from G id to N id
 
 # DONE If a task is ticked on Google Calendar, it should be ticket on Notion as well, etc.
 # DONE If a task is changed (text edited) in GC it should be changed in Notion as well

@@ -15,7 +15,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import redis
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 # -----------------
 # SETUP
@@ -133,15 +133,15 @@ def update_google_tasks(service, notion_tasks, task_list_id):
             ).execute()
 
 
-def create_notion_tasklist(service) -> str:
+def create_notion_tasklist(service, title) -> str:
     """Create a dedicated TaskList in Google Tasks if it does not exist"""
 
     for task_list in service.tasklists().list().execute()["items"]:
-        if task_list["title"] == "Tasks from Notion":
+        if task_list["title"] == title:
             return task_list["id"]
 
     new_task_list = (
-        service.tasklists().insert(body={"title": "Tasks from Notion"}).execute()
+        service.tasklists().insert(body={"title": title}).execute()
     )
     return new_task_list["id"]
 
@@ -193,7 +193,7 @@ def remove_deleted_tasks_ids_from_redis(service, notion_tasks, task_list_id):
 if __name__ == "__main__":
 
     load_dotenv()
-    NOTION_ID = os.getenv("NOTION_KEY")  #NOTION_KEY
+    NOTION_ID = os.getenv("NOTION_KEY")  # NOTION_KEY
     if NOTION_ID is None:
         raise KeyError("Missing NOTION ID environment variable")
 
@@ -206,30 +206,32 @@ if __name__ == "__main__":
     page_ids = get_all_pages(client)
 
     # Get every block from each page id
-    all_blocks = []
+    total_blocks = []
+
     for page_id in page_ids:
-        all_blocks.extend(get_all_blocks(client, page_id))
+        total_blocks.extend(get_all_blocks(client, page_id))
 
     # Get all Notion todos
-    notion_tasks = get_todo(client, all_blocks)
+    total_notion_tasks = get_todo(client, total_blocks)
+    
+    for page_id in page_ids:
+        # import ipdb;ipdb.set_trace()
+        all_blocks = []
+        
+        all_blocks.extend(get_all_blocks(client, page_id))
+        notion_tasks = get_todo(client, all_blocks)
 
-    TASK_LIST_ID = create_notion_tasklist(service)
 
-    # Insert tasks from Notion to Google
-    insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
+        title = client.blocks.retrieve(page_id)["child_page"]["title"]
+        TASK_LIST_ID = create_notion_tasklist(service, title)
 
-    # TODO replace .keys() with something more efficient later
-    # If redis is empty, or new todo has been added, update the database
-    if not r.keys() or len(r.keys()) < len(notion_tasks):  # add a
-        logging.info("Adding new data to Redis")
+        # Insert tasks from Notion to Google
+        insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
+
         add_id_mapping_to_redis(service, notion_tasks, TASK_LIST_ID)
 
-    # If redis has more keys than current notion_tasks, delete the Google task and that key
-    if len(r.keys()) > len(notion_tasks):
-        logging.info("Deleting tasks")
-        remove_deleted_tasks_ids_from_redis(service, notion_tasks, TASK_LIST_ID)
+        remove_deleted_tasks_ids_from_redis(service, total_notion_tasks, TASK_LIST_ID)
 
-    # Update the state of tasks, whenever needed (checked, changed name, etc.)
-    update_google_tasks(service, notion_tasks, TASK_LIST_ID)
+        update_google_tasks(service, notion_tasks, TASK_LIST_ID)
 
 
