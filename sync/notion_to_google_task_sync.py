@@ -22,7 +22,9 @@ import redis
 
 SCOPES = ["https://www.googleapis.com/auth/tasks"]
 
-r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+r = redis.Redis(host="localhost", port=6379, decode_responses=True, db=0)
+
+r_reverse = redis.Redis(host="localhost", port=6379, decode_responses=True, db=1)
 
 # -----------------
 # NOTION FUNCTIONS
@@ -170,6 +172,8 @@ def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
                 and notion_task["status"] == google_task["status"]
             ):
                 r.set(notion_task["id"], google_task["id"])
+                r_reverse.set(google_task["id"], notion_task["id"]) # store reverse mapping in db1
+
                 logging.info(
                     f"Successfully added k: {notion_task['id']} v: {google_task['id']}"
                 )
@@ -187,13 +191,14 @@ def remove_deleted_tasks_ids_from_redis(service, notion_tasks, task_list_id):
             service.tasks().delete(
                 tasklist=task_list_id, task=r.get(notion_id_in_db)
             ).execute()
+            google_task_id = r.get(notion_id_in_db)
             r.delete(notion_id_in_db)
-
+            r_reverse.delete(google_task_id)
 
 if __name__ == "__main__":
 
     load_dotenv()
-    NOTION_ID = os.getenv("NOTION_KEY")  # NOTION_KEY
+    NOTION_ID = os.getenv("NOTION_KEY")
     if NOTION_ID is None:
         raise KeyError("Missing NOTION ID environment variable")
 
