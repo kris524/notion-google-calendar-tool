@@ -120,11 +120,6 @@ def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
 def update_google_tasks(service, notion_tasks, task_list_id):
     """Function that Updates tasks. Closes tasks marked as completed from Notion to Google Takss"""
 
-    current_google_tasks = [
-        {"title": task["title"], "id": task["id"], "status": task["status"]}
-        for task in service.tasks().list(tasklist=task_list_id).execute()["items"]
-    ]
-
     for notion_task in notion_tasks:
 
         if r.get(notion_task["id"]) is not None:

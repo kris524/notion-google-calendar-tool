@@ -24,12 +24,7 @@ def get_pages_data(client: Client) -> List[str]:
 # DONE If a task is ticked on Google Calendar, it should be ticket on Notion as well, etc.
 # DONE If a task is changed (text edited) in GC it should be changed in Notion as well
 # DONE If a task is added in GC, add it to Notion, corresponding page AND redis
-# TODO If a task is deleted on GC, if should be deleted in Notion as well AND in the database
-
-# TODO Add logic to prevent user from adding a notion page with a title that already exist in GT
-
-# TODO ?? What if we create a new GT page? Should we create a new Notion page?
-# Like we currently do the other way around?
+# DONE If a task is deleted on GC, if should be deleted in Notion as well AND in the database
 
 
 def insert_google_task_into_notion(service, client, task_list_id):
@@ -40,18 +35,15 @@ def insert_google_task_into_notion(service, client, task_list_id):
         for task in service.tasks().list(tasklist=task_list_id).execute()["items"]
     ]
 
-    # import ipdb;ipdb.set_trace()
-
+    # get the notion page id of the page where we want to insert the new task
     google_tasklist_title = (
         service.tasklists().get(tasklist=task_list_id).execute()["title"]
     )
-
     pages_data = get_pages_data(client)
-
-    # get the notion page id of the page where we want to insert the new task
     notion_page_id = pages_data[google_tasklist_title]
 
     for google_task in current_google_tasks[::-1]:
+        # if we reach an id that
         if r_reverse.get(google_task["id"]) is None:
 
             if google_task["status"] == "needsAction":
@@ -72,10 +64,33 @@ def insert_google_task_into_notion(service, client, task_list_id):
             )
 
             # this should be done in another function. Use it for demo for now
-            r.set(
-                notion_task["results"][0]["id"], google_task["id"]
-            )  # correct one notion_task["results"][0]["id"]
+            r.set(notion_task["results"][0]["id"], google_task["id"])
             r_reverse.set(google_task["id"], notion_task["results"][0]["id"])
+
+
+def remove_deleted_google_tasks(service, client, task_list_ids):
+    """Delete NT that has been removed from GT"""
+
+    current_google_task_ids = []
+
+    for tasklist_id in task_list_ids:  # get all tasks from each Google tasklist
+
+        current_google_task_ids.extend(
+            [
+                task["id"]
+                for task in service.tasks()
+                .list(tasklist=tasklist_id, showHidden=True)
+                .execute()["items"]
+            ]
+        )
+
+    for google_task_id in r_reverse.keys():
+        if google_task_id not in current_google_task_ids:
+
+            notion_id_in_db = r_reverse.get(google_task_id)
+            client.blocks.delete(notion_id_in_db)
+            r.delete(notion_id_in_db)
+            r_reverse.delete(google_task_id)
 
 
 def update_notion_tasks(service, client, task_list_id):
@@ -111,14 +126,18 @@ if __name__ == "__main__":
     client = Client(auth=NOTION_ID)
     service = authenticate_and_print()
 
-    tasklists_id = [
-        "eEctUkkwdGctZ3Q1d3RoQg",
-        "TXN4Y01pN2FOTk9kTnpUbw",
-        "aXBIaHhfNVMzeGo5VWVncg",
-    ]
-
-    update_notion_tasks(service, client, task_list_id="eEctUkkwdGctZ3Q1d3RoQg")
+    update_notion_tasks(service, client, task_list_id="dWtPeGlHSkQycFJzbS1CRA")
 
     insert_google_task_into_notion(
-        service, client, task_list_id="eEctUkkwdGctZ3Q1d3RoQg"
+        service, client, task_list_id="dWtPeGlHSkQycFJzbS1CRA"
     )
+
+    # TODO: Last one, you need to be able to get all tasklist ids from GT, avoiding the Defaul list
+    # TODO Add logic to prevent user from adding a notion page with a title that already exist in GT
+    tasklist_ids = [
+        "dWtPeGlHSkQycFJzbS1CRA",
+        "d3g2elhWNkc5UzdLNmo5Yw",
+        "OTBJZnR3ZllvUUNCa3NJUA",
+    ]
+
+    remove_deleted_google_tasks(service, client, task_list_ids=tasklist_ids)
