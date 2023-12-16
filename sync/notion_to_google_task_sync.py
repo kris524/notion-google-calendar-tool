@@ -15,14 +15,16 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import redis
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 # -----------------
 # SETUP
 
 SCOPES = ["https://www.googleapis.com/auth/tasks"]
 
-r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+r = redis.Redis(host="localhost", port=6379, decode_responses=True, db=0)
+
+r_reverse = redis.Redis(host="localhost", port=6379, decode_responses=True, db=1)
 
 # -----------------
 # NOTION FUNCTIONS
@@ -118,11 +120,6 @@ def insert_notion_tasks_in_google_tasks(service, notion_tasks, task_list_id):
 def update_google_tasks(service, notion_tasks, task_list_id):
     """Function that Updates tasks. Closes tasks marked as completed from Notion to Google Takss"""
 
-    current_google_tasks = [
-        {"title": task["title"], "id": task["id"], "status": task["status"]}
-        for task in service.tasks().list(tasklist=task_list_id).execute()["items"]
-    ]
-
     for notion_task in notion_tasks:
 
         if r.get(notion_task["id"]) is not None:
@@ -133,16 +130,14 @@ def update_google_tasks(service, notion_tasks, task_list_id):
             ).execute()
 
 
-def create_notion_tasklist(service) -> str:
+def create_notion_tasklist(service, title) -> str:
     """Create a dedicated TaskList in Google Tasks if it does not exist"""
 
     for task_list in service.tasklists().list().execute()["items"]:
-        if task_list["title"] == "Tasks from Notion":
+        if task_list["title"] == title:
             return task_list["id"]
 
-    new_task_list = (
-        service.tasklists().insert(body={"title": "Tasks from Notion"}).execute()
-    )
+    new_task_list = service.tasklists().insert(body={"title": title}).execute()
     return new_task_list["id"]
 
 
@@ -170,6 +165,10 @@ def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
                 and notion_task["status"] == google_task["status"]
             ):
                 r.set(notion_task["id"], google_task["id"])
+                r_reverse.set(
+                    google_task["id"], notion_task["id"]
+                )  # store reverse mapping in db1
+
                 logging.info(
                     f"Successfully added k: {notion_task['id']} v: {google_task['id']}"
                 )
@@ -187,49 +186,6 @@ def remove_deleted_tasks_ids_from_redis(service, notion_tasks, task_list_id):
             service.tasks().delete(
                 tasklist=task_list_id, task=r.get(notion_id_in_db)
             ).execute()
+            google_task_id = r.get(notion_id_in_db)
             r.delete(notion_id_in_db)
-
-
-if __name__ == "__main__":
-
-    load_dotenv()
-    NOTION_ID = os.getenv("NOTION_KEY")  #NOTION_KEY
-    if NOTION_ID is None:
-        raise KeyError("Missing NOTION ID environment variable")
-
-    service = authenticate_and_print()
-
-    # Create Client
-    client = Client(auth=NOTION_ID)
-
-    # Get all page ids
-    page_ids = get_all_pages(client)
-
-    # Get every block from each page id
-    all_blocks = []
-    for page_id in page_ids:
-        all_blocks.extend(get_all_blocks(client, page_id))
-
-    # Get all Notion todos
-    notion_tasks = get_todo(client, all_blocks)
-
-    TASK_LIST_ID = create_notion_tasklist(service)
-
-    # Insert tasks from Notion to Google
-    insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
-
-    # TODO replace .keys() with something more efficient later
-    # If redis is empty, or new todo has been added, update the database
-    if not r.keys() or len(r.keys()) < len(notion_tasks):  # add a
-        logging.info("Adding new data to Redis")
-        add_id_mapping_to_redis(service, notion_tasks, TASK_LIST_ID)
-
-    # If redis has more keys than current notion_tasks, delete the Google task and that key
-    if len(r.keys()) > len(notion_tasks):
-        logging.info("Deleting tasks")
-        remove_deleted_tasks_ids_from_redis(service, notion_tasks, TASK_LIST_ID)
-
-    # Update the state of tasks, whenever needed (checked, changed name, etc.)
-    update_google_tasks(service, notion_tasks, TASK_LIST_ID)
-
-
+            r_reverse.delete(google_task_id)
