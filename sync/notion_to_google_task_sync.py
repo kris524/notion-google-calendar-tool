@@ -137,9 +137,7 @@ def create_notion_tasklist(service, title) -> str:
         if task_list["title"] == title:
             return task_list["id"]
 
-    new_task_list = (
-        service.tasklists().insert(body={"title": title}).execute()
-    )
+    new_task_list = service.tasklists().insert(body={"title": title}).execute()
     return new_task_list["id"]
 
 
@@ -167,7 +165,9 @@ def add_id_mapping_to_redis(service, notion_tasks, task_list_id):
                 and notion_task["status"] == google_task["status"]
             ):
                 r.set(notion_task["id"], google_task["id"])
-                r_reverse.set(google_task["id"], notion_task["id"]) # store reverse mapping in db1
+                r_reverse.set(
+                    google_task["id"], notion_task["id"]
+                )  # store reverse mapping in db1
 
                 logging.info(
                     f"Successfully added k: {notion_task['id']} v: {google_task['id']}"
@@ -189,49 +189,3 @@ def remove_deleted_tasks_ids_from_redis(service, notion_tasks, task_list_id):
             google_task_id = r.get(notion_id_in_db)
             r.delete(notion_id_in_db)
             r_reverse.delete(google_task_id)
-
-if __name__ == "__main__":
-
-    load_dotenv()
-    NOTION_ID = os.getenv("NOTION_KEY")
-    if NOTION_ID is None:
-        raise KeyError("Missing NOTION ID environment variable")
-
-    service = authenticate_and_print()
-
-    # Create Client
-    client = Client(auth=NOTION_ID)
-
-    # Get all page ids
-    page_ids = get_all_pages(client)
-
-    # Get every block from each page id
-    total_blocks = []
-
-    for page_id in page_ids:
-        total_blocks.extend(get_all_blocks(client, page_id))
-
-    # Get all Notion todos
-    total_notion_tasks = get_todo(client, total_blocks)
-    
-    for page_id in page_ids:
-        # import ipdb;ipdb.set_trace()
-        all_blocks = []
-        
-        all_blocks.extend(get_all_blocks(client, page_id))
-        notion_tasks = get_todo(client, all_blocks)
-
-
-        title = client.blocks.retrieve(page_id)["child_page"]["title"]
-        TASK_LIST_ID = create_notion_tasklist(service, title)
-
-        # Insert tasks from Notion to Google
-        insert_notion_tasks_in_google_tasks(service, notion_tasks, TASK_LIST_ID)
-
-        add_id_mapping_to_redis(service, notion_tasks, TASK_LIST_ID)
-
-        remove_deleted_tasks_ids_from_redis(service, total_notion_tasks, TASK_LIST_ID)
-
-        update_google_tasks(service, notion_tasks, TASK_LIST_ID)
-
-
