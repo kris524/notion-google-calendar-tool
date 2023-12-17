@@ -2,18 +2,16 @@
 from notion_client import Client
 from typing import List
 from sync.notion_to_google_task_sync import r_reverse, r
+from datetime import datetime
 
 
-def get_pages_data(client: Client) -> List[str]:
-    """Get all pages that have enabled the integration"""
-    # import ipdb;ipdb.set_trace()
-    pages_data = {}
-    for page in client.search()["results"]:
-
-        title = page["properties"]["title"]["title"][0]["plain_text"]
-        pages_data[title] = page["id"]
-
-    return pages_data
+def get_last_updated_time(service, task_list_id): 
+    """Get google tasks last updated time"""
+    datetimes = [task["updated"] for task in service.tasks().list(tasklist=task_list_id).execute()["items"]]
+    if len(datetimes) == 0:
+        return None
+    date = datetime.fromisoformat(max(datetimes))
+    return date.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def insert_google_task_into_notion(service, client, notion_page_id, task_list_id):
@@ -49,18 +47,20 @@ def insert_google_task_into_notion(service, client, notion_page_id, task_list_id
             r_reverse.set(google_task["id"], notion_task["results"][0]["id"])
 
 
-def remove_deleted_google_tasks(service, client, task_list_id):
+def remove_deleted_google_tasks(service, client, task_list_ids):
     """Delete NT that has been removed from GT"""
-
     current_google_task_ids = []
 
-    current_google_task_ids = [
-        task["id"]
-        for task in service.tasks()
-        .list(tasklist=task_list_id, showHidden=True)
-        .execute()["items"]
-    ]
-
+    for tasklist_id in task_list_ids:  # get all tasks from each Google tasklist
+        # TODO Fix this problem 
+        current_google_task_ids.extend(
+            [
+                task["id"]
+                for task in service.tasks()
+                .list(tasklist=tasklist_id, showHidden=True)
+                .execute()["items"]
+            ]
+        )
     for google_task_id in r_reverse.keys():
         if google_task_id not in current_google_task_ids:
 
