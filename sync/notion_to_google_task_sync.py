@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from typing import List, Dict
 import os.path
 import logging
-
+from datetime import datetime
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -41,6 +41,15 @@ def get_all_pages(client: Client) -> List[str]:
         logging.info("No notion pages have enabled the integration")
 
     return page_ids
+
+
+def get_last_edited_time(client, page_id):
+    """Get notion page last edited time"""
+
+    for page in client.search()["results"]:
+        if page["id"] == page_id:
+            date = datetime.fromisoformat(page["last_edited_time"])
+            return date.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def get_all_blocks(client: Client, page_id: str) -> List[Dict[str, str]]:
